@@ -227,7 +227,7 @@ getType3MSGElem[sgno_Integer,cgens_List,OptionsPattern[]]/;AllTrue[cgens,StringQ
   ];
   gens=Join[{#,0}&/@Complement[gens0,cgens], {#,1}&/@cgens];
   brav=getSGLatt[sgno];
-  times[{R1_,a1_},{R2_,a2_}]:={getRotName[brav,getRotMat[brav,R1].getRotMat[brav,R2]],Mod[a1+a2,2]};
+  times[{R1_,a1_},{R2_,a2_}]:={getRotName[brav,getRotMat[brav,R1] . getRotMat[brav,R2]],Mod[a1+a2,2]};
   MSG0=SortBy[generateGroup[gens,{"E",0},times],RotNameIndex[#[[1]]]&];
   tmp=Association[Rule@@@MSG0];
   SG=getLGElem[sgno,"\[CapitalGamma]"];
@@ -294,7 +294,7 @@ getMSGElem[{sgno_, num_},OptionsPattern[]]:=Module[{tmp,MSG,G,nums,pos,fun},
 
 (* Get the magnetic little group. MSG is the element list of the magnetic space group.*)
 getMLGElem[brav_String, MSG_List, k_]/;VectorQ[k]:=Module[{rotk,sele,LG,mLGu,mLGau},
-  rotk={getRotMatOfK[brav,StringReplace[#[[1]],"bar"->""]].k, #}&/@MSG;
+  rotk={getRotMatOfK[brav,StringReplace[#[[1]],"bar"->""]] . k, #}&/@MSG;
   sele=Select[rotk,If[#[[2,3]]==0,keqmod[k,#[[1]]],keqmod[-k,#[[1]]]]&];
   mLG=sele[[All,2]];  mLGu=Select[mLG,#[[3]]==0&];  mLGau=Select[mLG,#[[3]]==1&];
   Join[mLGu,mLGau]  (*put all unitary elements in front*)
@@ -444,7 +444,7 @@ Options[getMagKStar]={"cosets"->False};
 getMagKStar[{sgno_, mno_}, kin_, OptionsPattern[]]:=Module[{k,MSG,brav,kall,star0,star,cosets},
   MSG=getMSGElem[{sgno,mno}];   brav=getSGLatt[sgno];
   k=If[!StringQ[kin], kin, kBCcoord[sgno,kin][[1,1]]];
-  kall={If[#[[3]]==0,1,-1]*getRotMatOfK[brav,#[[1]]].k, #}&/@MSG;
+  kall={If[#[[3]]==0,1,-1]*getRotMatOfK[brav,#[[1]]] . k, #}&/@MSG;
   star0=Gather[kall,keqmod[#1[[1]],#2[[1]]]&];
   star=star0[[All,1,1]];   cosets=star0[[All,All,2]];
   If[OptionValue["cosets"]===True, {star,cosets}, star]
@@ -641,7 +641,7 @@ getMPGCorep[mpg_,OptionsPattern[]]:=Module[{n,msgno,smap,dmap,MPG,subno,H,Hstd,A
   iAa=Hidx@times[inv[A],#]&/@AH;
   For[i=1,i<=ncor,i++, j=subidx[[i]];
     If[IntegerQ[j],
-      tmp=If[MatrixQ[ir[[j,1]]], #.matN[[j]]&/@ir[[j,aiA]], ir[[j,aiA]]];
+      tmp=If[MatrixQ[ir[[j,1]]], # . matN[[j]]&/@ir[[j,aiA]], ir[[j,aiA]]];
       If[type[[j]]=="a",
         cor[[i]]=Join[ir[[j]], tmp]; clb[[i]]=lb[[j]], (*---next line else: b---*)
         cor[[i]]=Join[ArrayFlatten[{{#,0},{0,#}}]&/@ir[[j]],ArrayFlatten[{{0,-#},{#,0}}]&/@tmp];
@@ -764,7 +764,7 @@ showMPGCorep[mpg_, OptionsPattern[]]:=Module[{n,mpgno,mpgcor,label,cor,elmopt,tm
     rots2=ComplexExpand@First@getSpinRotOp[#]&/@elems[[All,1]];
     tmp="(\[DownArrow]\[UpArrow])";
     If[OptionValue["spin"]==="updown", 
-       tmp="(\[UpArrow]\[DownArrow])"; rots2={{0,1},{1,0}}.#.{{0,1},{1,0}}&/@rots2
+       tmp="(\[UpArrow]\[DownArrow])"; rots2={{0,1},{1,0}} . # . {{0,1},{1,0}}&/@rots2
     ];
     rots2={Column[{"Spin"<>tmp,"rotation","matrix"}], spl, Sequence@@MatrixForm/@rots2};
     tab=Prepend[tab,rots1];  nstart=4;
@@ -954,20 +954,20 @@ findMatrixN[Delta_, barDelta_]:=Module[{tryN,len,d,i,tmp,q,U1q},
   If[!MatrixQ[Delta[[1]]], Return[1]];
   (*----------method 2, maybe not work in some cases--------------*)
   len=Length[Delta];  d=Dimensions[Delta[[1]]]//First;
-  tryN=Total@Table[Delta[[i]].barDelta[[i]]\[ConjugateTranspose],{i,len}]/len//Simplify[#,u\[Element]Reals]&; 
-  If[Total@Flatten@Abs[tryN.tryN\[ConjugateTranspose]-IdentityMatrix[d]]<1*^-8, Return[tryN]]; 
+  tryN=Total@Table[Delta[[i]] . barDelta[[i]]\[ConjugateTranspose],{i,len}]/len//Simplify[#,u\[Element]Reals]&; 
+  If[Total@Flatten@Abs[tryN . tryN\[ConjugateTranspose]-IdentityMatrix[d]]<1*^-8, Return[tryN]]; 
   (*----------method 3, work in any case--------------*)
   For[i=1,i<=d,i++, 
     tmp=Total[Delta[[All,1,1]]\[Conjugate]*barDelta[[All,i,i]]]*d/len//Simplify[#,u\[Element]Reals]&//Chop;  
       If[Abs[tmp]>1*^-8,  q=i; U1q=Sqrt[tmp]; Break[]]
   ];
   tryN=Table[Total[Delta[[All,1,i]]\[Conjugate]*barDelta[[All,q,j]]],{i,d},{j,d}]*d/(len*U1q)//Simplify[#,u\[Element]Reals]&//Chop;
-  If[Total@Flatten@Abs[tryN.tryN\[ConjugateTranspose]-IdentityMatrix[d]]>1*^-8, Print["findMatrixN: N is not unitary"]];
+  If[Total@Flatten@Abs[tryN . tryN\[ConjugateTranspose]-IdentityMatrix[d]]>1*^-8, Print["findMatrixN: N is not unitary"]];
   tryN
 ]
 
 
-(* ::Subsection:: *)
+(* ::Subsection::Closed:: *)
 (*For type-3 MSG*)
 
 
@@ -988,13 +988,13 @@ SeitzConvert[brav1_String, brav2_String, T_, os_, R_, Rspin_]:=Function[{Rv},
   sx={{0,1},{1,0}};   Rname=Rv[[1]];  v=Rv[[2]];
   rot=getRotMat[brav1,StringReplace[Rname,"bar"->""]];
   (* Making the matrics numeric will speed up the calculations! *)
-  iT=Inverse[T//N];    rot2=iT.rot.T;    v2= iT.v-rot2.os+os;
+  iT=Inverse[T//N];    rot2=iT . rot . T;    v2= iT . v-rot2 . os+os;
   If[Rspin=!=None,  RSpin=Rspin,
     {Raxis,Rang}=rotAxisAngle[R//N][[{2,3}]];       
-    RSpin=MatrixExp[-I*Rang*Raxis.(PauliMatrix/@{1,2,3})/2]//Simplify
+    RSpin=MatrixExp[-I*Rang*Raxis . (PauliMatrix/@{1,2,3})/2]//Simplify
   ];
   {srot,o3det}=getSpinRotOp[Rname];
-  srot2=sx.RSpin.sx.srot.sx.RSpin\[ConjugateTranspose].sx//Simplify;
+  srot2=sx . RSpin . sx . srot . sx . RSpin\[ConjugateTranspose] . sx//Simplify;
   Rn2=getRotName[brav2,rot2];
   sRn2=getSpinRotName[brav2,{srot2,o3det}];
   If[StringReplace[sRn2,"bar"->""]!=Rn2, Print["SeitzConvert: error, ",Rn2,"!=",sRn2]];
@@ -1080,8 +1080,8 @@ getType3MLGCorep[{sgno_,num_}, k_, BZtype_String, OptionsPattern[]]:=
   {Gno,T,os,R}=type3USubInfo[{sgno,num}];  brav2=getSGLatt[Gno]; 
   MLG0=Select[MLG,#[[3]]==0&][[All,{1,2}]];  
   antiU=Select[MLG,#[[3]]==1&][[All,{1,2}]];  
-  k2=T\[Transpose].kco;   (*convert k-point coordinates from MSG to its unitary subgroup.*) 
-  If[bvec=!=None, bvec=(R.bvec\[Transpose].T)\[Transpose]//Simplify];  (*convert the basic vectors to the subgroup's ones*)
+  k2=T\[Transpose] . kco;   (*convert k-point coordinates from MSG to its unitary subgroup.*) 
+  If[bvec=!=None, bvec=(R . bvec\[Transpose] . T)\[Transpose]//Simplify];  (*convert the basic vectors to the subgroup's ones*)
   If[MemberQ[{"TricPrim","MonoPrim","MonoBase"},brav2], bvec=None]; (*avoid checkBasVec for Tric and Mono*)
   reptab=getLGIrepTab[Gno,k2/.usub,"abcOrBasVec"->bvec,"format"->False]; 
   tmp=type3kpairDict[{{sgno,num},kname}];
@@ -1114,12 +1114,12 @@ getType3MLGCorep[{sgno_,num_}, k_, BZtype_String, OptionsPattern[]]:=
     ch=Association[Rule@@@Transpose[{Gk[[All,1]],rep}]];
     (trans["bar"<>#]=trans[#])&/@Gk[[All,1]];
     (ch["bar"<>#]=-ch[#])&/@Gk[[All,1]]; 
-    ch[R]*Exp[-I*k2.(v-trans[R])*2Pi]//realSimplify
+    ch[R]*Exp[-I*k2 . (v-trans[R])*2Pi]//realSimplify
   ];
   
   sx={{0,1},{1,0}};
   {Raxis,Rang}=rotAxisAngle[R//N][[{2,3}]];    
-  Rspin=MatrixExp[-I*Rang*Raxis.(PauliMatrix/@{1,2,3})/2]//Simplify; 
+  Rspin=MatrixExp[-I*Rang*Raxis . (PauliMatrix/@{1,2,3})/2]//Simplify; 
 
   conv=SeitzConvert[brav,brav2,T,os,R,Rspin];     
   tmp=DSGSeitzTimes[brav][#,#]&/@antiU;    tmp=conv/@tmp;  
@@ -1218,11 +1218,11 @@ getType3MLGCorep[{sgno_,num_}, k_, BZtype_String, OptionsPattern[]]:=
     ];
     Switch[stypes[[i]],
       "a", AppendTo[slb2,slb[[i]]]; AppendTo[sidx,i]; AppendTo[stypes2,"a"];
-           tmp=If[MatrixQ[matN], #.matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
+           tmp=If[MatrixQ[matN], # . matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
            AppendTo[scorep, Join[Delta,tmp]]; 
            ,
       "b", AppendTo[slb2,slb[[i]]]; AppendTo[sidx,i]; AppendTo[stypes2,"b"];
-           tmp=If[MatrixQ[matN], #.matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
+           tmp=If[MatrixQ[matN], # . matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
            tmp=ArrayFlatten[{{0,-#},{#,0}}]&/@tmp;
            AppendTo[scorep, Join[ArrayFlatten[{{#,0},{0,#}}]&/@Delta,tmp]]; 
            ,
@@ -1268,11 +1268,11 @@ getType3MLGCorep[{sgno_,num_}, k_, BZtype_String, OptionsPattern[]]:=
     ];
     Switch[dtypes[[i]],
       "a", AppendTo[dlb2,dlb[[i]]]; AppendTo[didx,i]; AppendTo[dtypes2,"a"];
-           tmp=If[MatrixQ[matN], #.matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
+           tmp=If[MatrixQ[matN], # . matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
            AppendTo[dcorep, Join[Delta,tmp]]; 
            ,
       "b", AppendTo[dlb2,dlb[[i]]]; AppendTo[didx,i]; AppendTo[dtypes2,"b"];
-           tmp=If[MatrixQ[matN], #.matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
+           tmp=If[MatrixQ[matN], # . matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
            tmp=ArrayFlatten[{{0,-#},{#,0}}]&/@tmp;
            AppendTo[dcorep, Join[ArrayFlatten[{{#,0},{0,#}}]&/@Delta,tmp]]; 
            , 
@@ -1404,7 +1404,7 @@ showType3MLGCorep[{sgno_,mno_}, kNameOrCoord_, BZtype_, OptionsPattern[]]:=Block
   rot=MatrixForm[getRotMat[brav,#]]&/@MLG[[idxelm,1]];
   trans=MatrixForm[{InputForm/@#}\[Transpose]]&/@MLG[[idxelm,2]];
   srot=getSpinRotOp[#][[1]]&/@MLG[[idxelm,1]];
-  If[OptionValue["spin"]=="updown", srot=sx.#.sx&/@srot];
+  If[OptionValue["spin"]=="updown", srot=sx . # . sx&/@srot];
   srot=MatrixForm[Expand[#]]&/@srot;
   sfl=SpanFromLeft;   sfa=SpanFromAbove;
   table={idxelm, showMSGSeitz/@MLG[[idxelm]], 
@@ -1450,7 +1450,7 @@ showType3MLGCorep[{sgno_,mno_}, kNameOrCoord_, BZtype_, OptionsPattern[]]:=Block
 ]
 
 
-(* ::Subsection:: *)
+(* ::Subsection::Closed:: *)
 (*For type-2 and type-4 MSG*)
 
 
@@ -1505,7 +1505,7 @@ getType24MLGCorep[{sgno_,num_}, k_, BZtype_String, OptionsPattern[]]:=
     ch=Association[Rule@@@Transpose[{Gk[[All,1]],rep}]];
     (trans["bar"<>#]=trans[#])&/@Gk[[All,1]];
     (ch["bar"<>#]=-ch[#])&/@Gk[[All,1]]; 
-    ch[R]*Exp[-I*kco.(v-trans[R])*2Pi]//realSimplify
+    ch[R]*Exp[-I*kco . (v-trans[R])*2Pi]//realSimplify
   ];
   
   dsquare=DSGSeitzTimes[brav][#,#]&/@antiU;   
@@ -1559,11 +1559,11 @@ getType24MLGCorep[{sgno_,num_}, k_, BZtype_String, OptionsPattern[]]:=
     ];
     Switch[stypes[[i]],
       "a", AppendTo[slb2,slb[[i]]]; AppendTo[sidx,i]; AppendTo[stypes2,"a"];
-           tmp=If[MatrixQ[matN], #.matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
+           tmp=If[MatrixQ[matN], # . matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
            AppendTo[scorep, Join[Delta,tmp]]; 
            ,
       "b", AppendTo[slb2,slb[[i]]]; AppendTo[sidx,i]; AppendTo[stypes2,"b"];
-           tmp=If[MatrixQ[matN], #.matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
+           tmp=If[MatrixQ[matN], # . matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
            tmp=ArrayFlatten[{{0,-#},{#,0}}]&/@tmp;
            AppendTo[scorep, Join[ArrayFlatten[{{#,0},{0,#}}]&/@Delta,tmp]]; 
            ,
@@ -1608,11 +1608,11 @@ getType24MLGCorep[{sgno_,num_}, k_, BZtype_String, OptionsPattern[]]:=
     ];
     Switch[dtypes[[i]],
       "a", AppendTo[dlb2,dlb[[i]]]; AppendTo[didx,i]; AppendTo[dtypes2,"a"];
-           tmp=If[MatrixQ[matN], #.matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
+           tmp=If[MatrixQ[matN], # . matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
            AppendTo[dcorep, Join[Delta,tmp]]; 
            ,
       "b", AppendTo[dlb2,dlb[[i]]]; AppendTo[didx,i]; AppendTo[dtypes2,"b"];
-           tmp=If[MatrixQ[matN], #.matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
+           tmp=If[MatrixQ[matN], # . matN&/@DeltaBiA, DeltaBiA*matN]//realSimplify;
            tmp=ArrayFlatten[{{0,-#},{#,0}}]&/@tmp;
            AppendTo[dcorep, Join[ArrayFlatten[{{#,0},{0,#}}]&/@Delta,tmp]]; 
            , 
@@ -1756,7 +1756,7 @@ showType24MLGCorep[{sgno_,mno_}, kNameOrCoord_, BZtype_, OptionsPattern[]]:=Bloc
   rot=MatrixForm[getRotMat[brav,#]]&/@MLG[[idxelm,1]];
   trans=MatrixForm[{InputForm/@#}\[Transpose]]&/@MLG[[idxelm,2]];
   srot=getSpinRotOp[#][[1]]&/@MLG[[idxelm,1]];
-  If[OptionValue["spin"]=="updown", srot=sx.#.sx&/@srot];
+  If[OptionValue["spin"]=="updown", srot=sx . # . sx&/@srot];
   srot=MatrixForm[Expand[#]]&/@srot;
   sfl=SpanFromLeft;   sfa=SpanFromAbove;
   table={idxelm, showMSGSeitz/@MLG[[idxelm]], 
@@ -1885,11 +1885,11 @@ checkMLGCorep[corepinfo_]:=Module[{MLG,mtab,scorep,dcorep, time, brav, fBZ, rot2
   mtab=Table[time[i,j],{i,MLG},{j,MLG}];
   itab=Table[rot2idx[mtab[[i,j,{1,3}]]],{i,n},{j,n}];  
   dvtab=Table[tmp=mtab[[i,j]];tmp=tmp[[2]]-rot2elem[tmp[[{1,3}]]][[2]],{i,n},{j,n}];
-  ftab=Table[Exp[-I*k.dvtab[[i,j]]*2Pi]//Chop,{i,n},{j,n}]; 
+  ftab=Table[Exp[-I*k . dvtab[[i,j]]*2Pi]//Chop,{i,n},{j,n}]; 
   tr=MLG[[All,3]];
   reptime[rep_,i_,j_]:=Module[{m1,m2,tr1,tr2},
      m1=rep[[i]]; m2=rep[[j]];  tr1=tr[[i]];  tr2=tr[[j]];
-     If[MatrixQ[m1], If[tr1==1,m1.m2\[Conjugate], m1.m2], If[tr1==1,m1*m2\[Conjugate], m1*m2]]//Simplify[#,u\[Element]Reals]&
+     If[MatrixQ[m1], If[tr1==1,m1 . m2\[Conjugate], m1 . m2], If[tr1==1,m1*m2\[Conjugate], m1*m2]]//Simplify[#,u\[Element]Reals]&
   ];
   repmtab[rep_]:=Table[reptime[rep,i,j],{i,n},{j,n}];
 
@@ -1909,7 +1909,7 @@ checkMLGCorep[corepinfo_]:=Module[{MLG,mtab,scorep,dcorep, time, brav, fBZ, rot2
 ]
 
 
-(* ::Subsection::Closed:: *)
+(* ::Subsection:: *)
 (*showMLGCorep*)
 
 
@@ -1925,6 +1925,11 @@ showMLGCorep[{sgno_,num_}, k_, BZtype_String, OptionsPattern[]]:=Module[{nums,po
   fun[{sgno,num},k,BZtype,(#->OptionValue[#])&/@{"uNumeric","corep","elem","rotmat","trace",
                            "spin","abcOrBasVec","linewidth","maxDim"}]
 ]
+
+Options[showType2MLGCorep]=Options[showMSGCorep];
+sgtomsg=Association[#1->{#1,#2}&@@@Keys[type2MSGSymText[[;;230]]]];
+showType2MLGCorep[sgno_,kNameOrCoord_, BZtype_, OptionsPattern[]]:=showMLGCorep[sgtomsg[sgno],kNameOrCoord, BZtype, (#->OptionValue[#])&/@Keys@Options[showMSGCorep]];
+showType2MLGCorep[sgno_,kNameOrCoord_, OptionsPattern[]]:=showMLGCorep[sgtomsg[sgno], kNameOrCoord, "a", (#->OptionValue[#])&/@Keys@Options[showMSGCorep]];
 
 
 (* ::Subsection::Closed:: *)
@@ -2001,9 +2006,9 @@ getMSGCorep[{sgno_, num_}, kNameOrCoord_, BZtype_String, OptionsPattern[]]:=Bloc
   bztypeORbvec=If[tmp===None, BZtype, If[Position[tmp,Rule]=={}, tmp, BasicVectors[brav]/.tmp]];
   
   getstar[kco_]:=Module[{s1,s2},  (* set kstar, kstar2a, kstar2b, cosetrep *)
-    s1={#,getRotMatOfK[brav,#[[1]]].kco}&/@MSG0;
+    s1={#,getRotMatOfK[brav,#[[1]]] . kco}&/@MSG0;
     s1=Gather[s1,keqmod[#1[[2]],#2[[2]]]&];
-    s2={#,-getRotMatOfK[brav,#[[1]]].kco}&/@MSG1;
+    s2={#,-getRotMatOfK[brav,#[[1]]] . kco}&/@MSG1;
     s2=Gather[s2,keqmod[#1[[2]],#2[[2]]]&];
     cosetrep=Join[s1[[All,1,1]], If[typex, s2[[All,1,1]], {}]];
     kstar2a=s1[[All,1,2]];   kstar2b=If[typex, s2[[All,1,2]],{}];
@@ -2033,7 +2038,7 @@ getMSGCorep[{sgno_, num_}, kNameOrCoord_, BZtype_String, OptionsPattern[]]:=Bloc
   ];
   subno=MLGkininfo["USubSG"];  typeIII=False;
   If[!MissingQ[subno], typeIII=True; TM=MLGkininfo["transformation_matrix"], subno=sgno];
-  If[typeIII, kstar2a=TM\[Transpose].#&/@kstar2a;  kstar2b=TM\[Transpose].#&/@kstar2b];
+  If[typeIII, kstar2a=TM\[Transpose] . #&/@kstar2a;  kstar2b=TM\[Transpose] . #&/@kstar2b];
   
   MLGk1=MLGk1info["MLG"];
   sstar="\!\(\*SuperscriptBox[\(\[InvisiblePrefixScriptBase]\), \(*\)]\)";
@@ -2045,7 +2050,7 @@ getMSGCorep[{sgno_, num_}, kNameOrCoord_, BZtype_String, OptionsPattern[]]:=Bloc
   Ettt={"E",{t\:2081,t\:2082,t\:2083},0};
   (* Efac=Exp[-I*2Pi*k1.tm[tm[inv[#],Ettt],#][[2]]]&/@cosetrep//Simplify; *)
   (* To check this, use {77,15},"W" *)
-  Efac=With[{tmp=Exp[-I*2Pi*k1.tm[tm[inv[#],Ettt],#][[2]]]//FullSimplify},
+  Efac=With[{tmp=Exp[-I*2Pi*k1 . tm[tm[inv[#],Ettt],#][[2]]]//FullSimplify},
              If[#[[3]]==0,tmp,tmp\[Conjugate]//FullSimplify[#,_Symbol\[Element]Reals]&]]&/@cosetrep; 
   
   invcsr=inv/@cosetrep;
@@ -2119,7 +2124,7 @@ getMSGCorep[{sgno_, num_}, kNameOrCoord_, BZtype_String, OptionsPattern[]]:=Bloc
       If[keqmod[k2a,-k2b],
         kname2b=underbar[kname2a];
         ,(*------else: k2b is not equivalent to -k2a ---------*)
-        tmp=If[typeIII&&MatrixQ[bztypeORbvec], (MLGkininfo["rotation_matrix"].bztypeORbvec\[Transpose].TM)\[Transpose]//Simplify, bztypeORbvec]; 
+        tmp=If[typeIII&&MatrixQ[bztypeORbvec], (MLGkininfo["rotation_matrix"] . bztypeORbvec\[Transpose] . TM)\[Transpose]//Simplify, bztypeORbvec]; 
         kinfo2b=identifyBCHSKptBySG[subno,tmp,(k2b/.usub)/.u->0.1];
         kname2b=kinfo2b[[2]];
         If[kname2b==kname2a, kname2b=kname2b<>"A"];
@@ -2239,9 +2244,9 @@ checkMSGCorep[corepinfo_]:=Module[{MSG,mtab,scorep,dcorep, time, brav, fBZ, rot2
   tr=MSG[[All,3]];
   reptime[rep_,i_,j_]:=Module[{m1,m2,tr1,tr2},
      m1=rep[[i]]; m2=rep[[j]];  tr1=tr[[i]];  tr2=tr[[j]];
-     If[MatrixQ[m1], If[tr1==1,m1.m2\[Conjugate], m1.m2], If[tr1==1,m1*m2\[Conjugate], m1*m2]]//Simplify[#,u\[Element]Reals]&
+     If[MatrixQ[m1], If[tr1==1,m1 . m2\[Conjugate], m1 . m2], If[tr1==1,m1*m2\[Conjugate], m1*m2]]//Simplify[#,u\[Element]Reals]&
   ];
-  tm[m1_,m2_]:=If[MatrixQ[m1],m1.m2,m1*m2]//Simplify;
+  tm[m1_,m2_]:=If[MatrixQ[m1],m1 . m2,m1*m2]//Simplify;
   repmtab[rep_]:=Table[reptime[rep,i,j],{i,n},{j,n}];
 
   dtime=DMSGSeitzTimes[brav];
@@ -2402,7 +2407,7 @@ showMSGCorep[{sgno_,mno_}, kNameOrCoord_, BZtype_, OptionsPattern[]]:=Block[{u,c
   rot=MatrixForm[getRotMat[brav,#]]&/@MSG[[idxelm,1]];
   trans=MatrixForm[{InputForm/@#}\[Transpose]]&/@MSG[[idxelm,2]];
   srot=getSpinRotOp[#][[1]]&/@MSG[[idxelm,1]];
-  If[OptionValue["spin"]=="updown", srot=sx.#.sx&/@srot];
+  If[OptionValue["spin"]=="updown", srot=sx . # . sx&/@srot];
   srot=MatrixForm[Expand[#]]&/@srot;
   sfl=SpanFromLeft;   sfa=SpanFromAbove;
   table={idxelm, showMSGSeitz/@MSG[[idxelm]], 
@@ -2559,7 +2564,7 @@ MSGCorepDirectProduct[{sgno_Integer, mno_},kin1_,kin2_,OptionsPattern[]]:=Module
     If[k1typex||k2typex,
       samestar=instar[tmp,tmp1],  (*else*)
       For[i=1,i<=Length[MSG],i++, 
-        tmp=getRotMatOfK[brav,MSG[[i,1]]].k1coord*If[MSG[[i,3]]==0,1,-1];
+        tmp=getRotMatOfK[brav,MSG[[i,1]]] . k1coord*If[MSG[[i,3]]==0,1,-1];
         If[keqmod[tmp,k2coord], samestar=True; Break[]]
       ];
     ];
@@ -2605,7 +2610,7 @@ MSGCorepDirectProduct[{sgno_Integer, mno_},kin1_,kin2_,OptionsPattern[]]:=Module
 
   tmp=OptionValue["abcOrBasVec"];
   If[Position[tmp,Rule]!={}, tmp=BasicVectors[brav]/.tmp];
-  If[tmp=!=None, tmp=(RM.tmp\[Transpose].TM)\[Transpose]//Simplify];  (*convert the basic vectors to the subgroup's ones*)
+  If[tmp=!=None, tmp=(RM . tmp\[Transpose] . TM)\[Transpose]//Simplify];  (*convert the basic vectors to the subgroup's ones*)
   If[MemberQ[{"TricPrim","MonoPrim","MonoBase"},subbrav], tmp=None]; (*avoid checkBasVec for Tric and Mono*)
   subopts="abcOrBasVec"->tmp;
   subDP=<||>;
@@ -2618,7 +2623,7 @@ MSGCorepDirectProduct[{sgno_Integer, mno_},kin1_,kin2_,OptionsPattern[]]:=Module
   subk3s=DeleteDuplicates[Join@@(Values/@Values@subDP[[All,1,4]]),keqmod[#1[[2]],#2[[2]]]&];
   nsubk3=Length[subk3s];  
   tmp=getRotMatOfK[subbrav,#]&/@subSG[[All,1]];
-  subk3stars=Table[Gather[#.subk3s[[i,2]]&/@tmp, keqmod][[All,1]], {i,nsubk3}];
+  subk3stars=Table[Gather[# . subk3s[[i,2]]&/@tmp, keqmod][[All,1]], {i,nsubk3}];
   ijnsubk3=subDP["ij"][[1,4]]//Length;
   For[tmp1=<||>;i=ijnsubk3+1,i<=nsubk3,i++,
     For[j=1,j<i,j++,
@@ -2631,7 +2636,7 @@ MSGCorepDirectProduct[{sgno_Integer, mno_},kin1_,kin2_,OptionsPattern[]]:=Module
   
   subk3partner=Association@Table[i->False,{i,nsubk3}];
   mapkidxup=mapkidxdown=k3coreps=k3labels=k3types=k3idxs=<||>;
-  k3s=If[!typeIII,subk3s,{#1,Inverse[TM\[Transpose]].#2}&@@@subk3s]//Chop;   (*this is only initial value*)
+  k3s=If[!typeIII,subk3s,{#1,Inverse[TM\[Transpose]] . #2}&@@@subk3s]//Chop;   (*this is only initial value*)
   k3s={#1,modone[#2+(0.5-1*^-14)]-(0.5-1*^-14)}&@@@k3s;
   For[j=0; i=1,i<=nsubk3,i++, 
     If[KeyExistsQ[mapkidxup,i], Continue[]];
@@ -3002,7 +3007,7 @@ generateLibMLGCorep[OptionsPattern[]]:=Module[{allmsgno,msgno,sgno,brav,knames,k
     fsPG=fullsymPG[sgno];
     dictk=<||>;
     For[i=1,i<=Length[knames],i++, k=knames[[i]]; kco=kcoords[[i]];
-      kcos=Gather[getRotMatOfK[brav,#].kco&/@fsPG,keqmod][[All,1]];
+      kcos=Gather[getRotMatOfK[brav,#] . kco&/@fsPG,keqmod][[All,1]];
       nukcos=modone[kcos/.usub];
       dictkco=<||>;
       For[j=1,j<=Length[nukcos],j++,
@@ -3153,14 +3158,14 @@ getBandCorep[{sgno_Integer, mno_Integer}, traceData_, ikOrListOrSpan_, ibOrListO
     (*Note that the bases of spin rotation matrices of BC are {down,up}, different from the
       usual {up,down} people used. So, a transformation by sx is needed. *)
     sx={{0,1},{1,0}};
-    getSpinRotName[brav,{sx.#1.sx,Det[#2]}]&@@@Transpose[{traceData["srot"],traceData["rot"]}]
+    getSpinRotName[brav,{sx . #1 . sx,Det[#2]}]&@@@Transpose[{traceData["srot"],traceData["rot"]}]
   ];
           
   kpathstr=StringRiffle[If[#1[[2]]!=""||#1[[1]]=="UN"||#1[[1]]=="GP", #1[[1]],
                           "["<>#1[[1]]<>"("<>ToString[#2]<>")]"]&
              @@@Transpose[{kinfoList[[All,{2,3}]],iks}],"-"];
 
-  reduceCorep[chartab_,Itypes_,chars_,ne_]:=chars\[Conjugate].#1/(#2*ne)&@@@Transpose[{chartab,Itypes}];
+  reduceCorep[chartab_,Itypes_,chars_,ne_]:=chars\[Conjugate] . #1/(#2*ne)&@@@Transpose[{chartab,Itypes}];
     
   (* Format of kinfo is like:
   {{-0.2,0.6,0.1},"GP","","C1"}
@@ -3212,7 +3217,7 @@ getBandCorep[{sgno_Integer, mno_Integer}, traceData_, ikOrListOrSpan_, ibOrListO
       Abort[];
     ]; 
     facbar=If[dsg, If[StringPosition[#[[1]],"bar"]!={},-1,1]&/@Mk0, Table[1,N0]];
-    factor=If[dt=MLG0[[#,2]]-Mk0[[#,2]];dt!={0,0,0},Exp[-I*k.dt*2Pi],1]&/@Range[N0]//Chop;
+    factor=If[dt=MLG0[[#,2]]-Mk0[[#,2]];dt!={0,0,0},Exp[-I*k . dt*2Pi],1]&/@Range[N0]//Chop;
     factor=factor*facbar;    
                 
     chars=traceData["trace"][[ik]];
